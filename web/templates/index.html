@@ -1,0 +1,528 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1">
+<title>AegisVision — Multi-Camera</title>
+
+<style>
+    :root {
+        --bg: #111820;
+        --panel: #1b2530;
+        --border: #32404b;
+        --text: #e3eaf0;
+        --muted: #94a4b0;
+        --accent: #79b8aa;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont,
+                     "Segoe UI", sans-serif;
+    }
+
+    .container {
+        max-width: 1460px;
+        margin: auto;
+        padding: 28px;
+    }
+
+    header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 28px;
+    }
+
+    h1 {
+        font-size: 22px;
+        letter-spacing: -.5px;
+        margin: 0;
+    }
+
+    h2 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .muted {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 7px;
+    }
+
+    .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+        gap: 15px;
+    }
+
+    .camera-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+    }
+
+    .camera-card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        overflow: hidden;
+    }
+
+    .camera-header {
+        padding: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .state {
+        color: #c58a78;
+        font-size: 11px;
+        letter-spacing: .5px;
+    }
+
+    .state.online {
+        color: var(--accent);
+    }
+
+    .video {
+        aspect-ratio: 16 / 9;
+        background: #080d12;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #788997;
+        font-size: 12px;
+        overflow: hidden;
+    }
+
+    .video img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: none;
+    }
+
+    .settings {
+        padding: 16px;
+        display: grid;
+        gap: 12px;
+    }
+
+    .source-row {
+        display: grid;
+        grid-template-columns: 125px minmax(0, 1fr);
+        gap: 10px;
+    }
+
+    select, input, button {
+        font: inherit;
+        font-size: 12px;
+        padding: 10px;
+        border-radius: 4px;
+    }
+
+    select, input {
+        width: 100%;
+        min-width: 0;
+        background: #111820;
+        border: 1px solid #41515e;
+        color: var(--text);
+    }
+
+    button {
+        border: 1px solid #526774;
+        background: #2c4654;
+        color: var(--text);
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: #385665;
+    }
+
+    button:disabled {
+        opacity: .5;
+        cursor: wait;
+    }
+
+    .controls {
+        display: flex;
+        gap: 10px;
+    }
+
+    .controls button {
+        flex: 1;
+    }
+
+    .secondary {
+        background: transparent;
+    }
+
+    .metrics {
+        display: flex;
+        gap: 24px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+    }
+
+    .metric span {
+        display: block;
+        font-size: 10px;
+        color: var(--muted);
+        margin-bottom: 5px;
+    }
+
+    .metric strong {
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .message {
+        color: var(--muted);
+        font-size: 11px;
+        min-height: 16px;
+        overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 900px) {
+        .camera-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 600px) {
+        .container { padding: 14px; }
+        .source-row { grid-template-columns: 1fr; }
+        header { gap: 12px; }
+    }
+</style>
+</head>
+
+<body>
+<div class="container">
+    <header>
+        <div>
+            <h1>AEGISVISION</h1>
+            <div class="muted">
+                Intelligent surveillance / Multi-camera monitoring
+            </div>
+        </div>
+        <div class="muted">LOCAL WORKSTATION</div>
+    </header>
+
+    <div class="toolbar">
+        <div>
+            <h2>Live Monitoring</h2>
+            <div class="muted">2 camera channels available</div>
+        </div>
+        <button onclick="refreshDevices()">
+            Refresh Devices
+        </button>
+    </div>
+
+    <div class="camera-grid" id="cameraGrid"></div>
+</div>
+
+<script>
+const slots = [1, 2];
+let devices = [];
+
+function cameraCard(slot) {
+    const number = String(slot).padStart(2, "0");
+
+    return `
+        <section class="camera-card">
+            <div class="camera-header">
+                <div>
+                    <h2>CAM ${number}</h2>
+                    <div class="muted"
+                         id="sourceName-${slot}">
+                         No source active
+                    </div>
+                </div>
+                <div class="state" id="state-${slot}">
+                    OFFLINE
+                </div>
+            </div>
+
+            <div class="video">
+                <span id="placeholder-${slot}">
+                    NO SIGNAL
+                </span>
+                <img id="stream-${slot}"
+                     alt="Camera ${number} feed">
+            </div>
+
+            <div class="settings">
+                <div class="source-row">
+                    <select id="type-${slot}"
+                            onchange="toggleSource(${slot})">
+                        <option value="local">
+                            Local
+                        </option>
+                        <option value="network">
+                            Network
+                        </option>
+                    </select>
+
+                    <select id="device-${slot}"></select>
+
+                    <input
+                        id="url-${slot}"
+                        type="text"
+                        placeholder="RTSP / HTTP stream URL"
+                        style="display:none">
+                </div>
+
+                <div class="controls">
+                    <button id="start-${slot}"
+                            onclick="startCamera(${slot})">
+                        Start Camera
+                    </button>
+
+                    <button class="secondary"
+                            onclick="stopCamera(${slot})">
+                        Stop
+                    </button>
+                </div>
+
+                <div class="metrics">
+                    <div class="metric">
+                        <span>FPS</span>
+                        <strong id="fps-${slot}">0.0</strong>
+                    </div>
+                    <div class="metric">
+                        <span>FACES</span>
+                        <strong id="faces-${slot}">0</strong>
+                    </div>
+                </div>
+
+                <div class="message" id="message-${slot}">
+                    Ready to connect.
+                </div>
+            </div>
+        </section>
+    `;
+}
+
+document.getElementById("cameraGrid").innerHTML =
+    slots.map(cameraCard).join("");
+
+function setMessage(slot, message) {
+    document.getElementById(
+        `message-${slot}`
+    ).textContent = message;
+}
+
+function toggleSource(slot) {
+    const network =
+        document.getElementById(`type-${slot}`).value
+        === "network";
+
+    document.getElementById(`device-${slot}`)
+        .style.display = network ? "none" : "block";
+
+    document.getElementById(`url-${slot}`)
+        .style.display = network ? "block" : "none";
+}
+
+async function refreshDevices() {
+    try {
+        const response = await fetch("/api/cameras");
+        if (!response.ok) {
+            throw new Error("Unable to list cameras");
+        }
+
+        const data = await response.json();
+        devices = data.devices;
+
+        for (const slot of slots) {
+            const select =
+                document.getElementById(`device-${slot}`);
+
+            const previous = select.value;
+            select.innerHTML = "";
+
+            for (const device of devices) {
+                const option =
+                    document.createElement("option");
+
+                option.value = device.index;
+                option.textContent =
+                    `${device.name} (${device.index})`;
+
+                select.appendChild(option);
+            }
+
+            if (devices.some(d => String(d.index) === previous)) {
+                select.value = previous;
+            }
+
+            setMessage(
+                slot,
+                `${devices.length} local device(s) found.`
+            );
+        }
+
+    } catch (error) {
+        for (const slot of slots) {
+            setMessage(slot, error.message);
+        }
+    }
+}
+
+async function startCamera(slot) {
+    const type =
+        document.getElementById(`type-${slot}`).value;
+
+    const source = type === "local"
+        ? document.getElementById(`device-${slot}`).value
+        : document.getElementById(`url-${slot}`).value.trim();
+
+    if (!source) {
+        setMessage(slot, "Select a camera source.");
+        return;
+    }
+
+    const button = document.getElementById(`start-${slot}`);
+    button.disabled = true;
+    setMessage(slot, "Connecting...");
+
+    try {
+        const response = await fetch(
+            `/api/cameras/${slot}/start`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    source_type: type,
+                    source
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Unable to start");
+        }
+
+        const img = document.getElementById(`stream-${slot}`);
+
+        img.src =
+            `/api/cameras/${slot}/stream?t=${Date.now()}`;
+
+        img.style.display = "block";
+
+        document.getElementById(`placeholder-${slot}`)
+            .style.display = "none";
+
+        setMessage(slot, "Camera connected.");
+
+    } catch (error) {
+        setMessage(slot, error.message);
+    } finally {
+        button.disabled = false;
+    }
+}
+
+async function stopCamera(slot) {
+    setMessage(slot, "Stopping...");
+
+    try {
+        const response = await fetch(
+            `/api/cameras/${slot}/stop`,
+            {method: "POST"}
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Unable to stop");
+        }
+
+        hideStream(slot);
+        setMessage(slot, "Camera stopped.");
+
+    } catch (error) {
+        setMessage(slot, error.message);
+    }
+}
+
+function hideStream(slot) {
+    const img = document.getElementById(`stream-${slot}`);
+    img.removeAttribute("src");
+    img.style.display = "none";
+
+    document.getElementById(`placeholder-${slot}`)
+        .style.display = "block";
+}
+
+async function updateStatus() {
+    try {
+        const response = await fetch("/api/status");
+        if (!response.ok) return;
+
+        const data = await response.json();
+
+        for (const cam of data.cameras) {
+            const slot = cam.slot;
+
+            const state =
+                document.getElementById(`state-${slot}`);
+
+            state.textContent = cam.online
+                ? "ONLINE"
+                : "OFFLINE";
+
+            state.className =
+                "state" + (cam.online ? " online" : "");
+
+            document.getElementById(`fps-${slot}`)
+                .textContent = cam.fps;
+
+            document.getElementById(`faces-${slot}`)
+                .textContent = cam.faces;
+
+            document.getElementById(`sourceName-${slot}`)
+                .textContent = cam.source || "No source active";
+
+            if (!cam.online) {
+                hideStream(slot);
+
+                if (cam.error) {
+                    setMessage(slot, cam.error);
+                }
+            }
+        }
+    } catch (error) {
+        // Server connection may be temporarily unavailable.
+    }
+}
+
+async function initialize() {
+    await refreshDevices();
+    await updateStatus();
+    setInterval(updateStatus, 1000);
+}
+
+initialize();
+</script>
+</body>
+</html>

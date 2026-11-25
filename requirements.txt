@@ -1,0 +1,8 @@
+ultralytics
+torch
+torchvision
+opencv-python
+cv2-enumerate-cameras
+fastapi
+uvicorn[standard]
+pydantic

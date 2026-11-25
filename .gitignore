@@ -1,0 +1,62 @@
+
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# macOS
+.DS_Store
+
+# Environment variables and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dataset and training files
+dataset/
+yolo_dataset/
+runs/
+
+# Local test videos
+test_videos/
+
+# CCTV recordings and databases
+web/recordings/
+web/database/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Temporary outputs
+outputs/
+temp/
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Large model files other than deployment model
+*.pt
+!models/best.pt
+*.onnx
+*.pth
+
+# Ultralytics sample datasets
+datasets/
+
+# Dataset audit output
+empty_labels_test.jpg
+
+# Ultralytics cache
+*.cache
